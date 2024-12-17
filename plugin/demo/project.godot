@@ -10,14 +10,18 @@ config_version=5
 
 [application]
 
-config/name="Android Plugin Demo"
+config/name="Godot Yandex Ads"
 run/main_scene="res://main.tscn"
-config/features=PackedStringArray("4.2", "GL Compatibility")
+config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [debug]
 
 settings/stdout/verbose_stdout=true
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/GodotYandexAds/plugin.cfg")
 
 [rendering]
 
