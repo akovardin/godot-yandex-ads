@@ -1,5 +1,6 @@
-# Godot Android Plugin Template
-This repository serves as a quickstart template for building a Godot Android plugin for Godot 4.2+.
+# Godot Yandex Ads
+
+Плагин под Godot 4.2+ для интеграции yandex рекламы с медиацией
 
 ## Contents
 * An illustrative simple Godot project: [`plugin/demo`](plugin/demo)

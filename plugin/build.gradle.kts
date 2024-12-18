@@ -40,7 +40,6 @@ android {
 dependencies {
     implementation("org.godotengine:godot:4.3.0.stable")
 
-    // TODO: Additional dependencies should be added to yandex_ads.gd as well.
     implementation("com.yandex.android:mobileads-mediation:7.8.0.0")
 }
 

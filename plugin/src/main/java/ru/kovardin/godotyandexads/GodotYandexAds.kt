@@ -168,6 +168,7 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
         banner.setAdUnitId(id);
         banner.setBackgroundColor(Color.TRANSPARENT);
 
+        // TODO: default params
         when (params[BANNER_SIZE_TYPE]) {
             BANNER_INLINE_SIZE ->
                 banner.setAdSize(BannerAdSize.inlineSize(godot.getActivity()!!, params[BANNER_WIDTH] as Int, params[BANNER_HEIGHT] as Int))
@@ -207,7 +208,7 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
             }
         })
 
-        banners["id"] = banner
+        banners[id] = banner
 
         layout.addView(banner, layoutParams);
         banner.loadAd(request());
@@ -306,8 +307,9 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
         godot.getActivity()?.runOnUiThread {
             if (interstitials.containsKey(id) && interstitials[id] != null) {
                 interstitials[id]?.show(godot.getActivity()!!)
+                Log.d(tag, "showInterstitial: interstitial ok");
             } else {
-                Log.w(tag, "showInterstitial");
+                Log.w(tag, "showInterstitial: interstitial not found");
             }
         }
     }
