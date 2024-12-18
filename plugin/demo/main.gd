@@ -36,6 +36,7 @@ func _ready():
 func _process(delta):
 	pass
 
+
 func _on_banner_button_pressed():
 	if Engine.has_singleton(_plugin_name):
 		var ads = Engine.get_singleton(_plugin_name)
