@@ -37,10 +37,8 @@ import com.yandex.mobile.ads.rewarded.RewardedAdEventListener
 import com.yandex.mobile.ads.rewarded.RewardedAdLoadListener
 import com.yandex.mobile.ads.rewarded.RewardedAdLoader
 
-class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
-
-
-    val tag = "YandexAds"
+class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
+    val tag = "GodotYandexAds"
 
     private lateinit var layout: FrameLayout
     private var layoutParams: FrameLayout.LayoutParams? = null
@@ -48,10 +46,6 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
     private var interstitials: MutableMap<String, InterstitialAd> = mutableMapOf()
     private var rewardeds: MutableMap<String, RewardedAd> = mutableMapOf()
     private var banners: MutableMap<String, BannerAdView> = mutableMapOf()
-
-//    private var interstitial: InterstitialAd? = null
-//    private var banner: BannerAdView? = null
-//    private var rewarded: RewardedAd? = null
 
     override fun getPluginName() = BuildConfig.GODOT_PLUGIN_NAME
 
@@ -126,7 +120,7 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
     }
 
     @UsedByGodot
-    fun loadBanner(id: String, params: Dictionary)  {
+    fun loadBanner(id: String, params: Dictionary) {
         godot.getActivity()?.runOnUiThread {
             if (!banners.containsKey(id) || banners[id] == null) {
                 createBanner(id, params)
@@ -137,76 +131,78 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
     }
 
     private fun createBanner(id: String, params: Dictionary) {
-        layout = godot.getActivity()!!.window.decorView.rootView as FrameLayout
+//        layout = godot.getActivity()!!.window.decorView.rootView as FrameLayout
+
+        val activity = activity
+        if (activity == null) {
+            Log.w(tag, "activity is null")
+            return
+        }
+
+        val banner = BannerAdView(activity)
 
         layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         )
 
-        val banner = BannerAdView(activity!!)
+        val position = params.getOrDefault(BANNER_POSITION, POSITION_BOTTOM) as Int
+        val safearea = params.getOrDefault(BANNER_SAFE_AREA, true) as Boolean
 
-        var position = POSITION_BOTTOM
-        if (params.containsKey(BANNER_POSITION)) {
-            position = params[BANNER_POSITION] as Int
-        }
-
-        var safearea = true
-        if (params.containsKey(BANNER_SAFE_AREA)) {
-            safearea = params[BANNER_SAFE_AREA] as Boolean
-        }
-
-        if (position == POSITION_BOTTOM) {
-            layoutParams?.gravity = Gravity.BOTTOM
-            if (safearea) banner.y = (-getSafeArea().bottom).toFloat()
-
-        } else if (position == POSITION_TOP) {
+        if (position == POSITION_TOP) {
             layoutParams?.gravity = Gravity.TOP
             if (safearea) banner.y = getSafeArea().top.toFloat()
+        } else { // default
+            layoutParams?.gravity = Gravity.BOTTOM
+            if (safearea) banner.y = (-getSafeArea().bottom).toFloat()
         }
 
-        banner.setAdUnitId(id);
-        banner.setBackgroundColor(Color.TRANSPARENT);
+        var sizeType = params.getOrDefault(BANNER_SIZE_TYPE, BANNER_STICKY_SIZE)
+        var width = params.getOrDefault(BANNER_WIDTH, 0) as Int
+        var height = params.getOrDefault(BANNER_HEIGHT, 0) as Int
 
-        // TODO: default params
-        when (params[BANNER_SIZE_TYPE]) {
+        when (sizeType) {
             BANNER_INLINE_SIZE ->
-                banner.setAdSize(BannerAdSize.inlineSize(godot.getActivity()!!, params[BANNER_WIDTH] as Int, params[BANNER_HEIGHT] as Int))
+                banner.setAdSize(BannerAdSize.inlineSize(activity, width, height))
+
             BANNER_STICKY_SIZE ->
-                banner.setAdSize(BannerAdSize.stickySize(godot.getActivity()!!, params[BANNER_WIDTH] as Int))
+                banner.setAdSize(BannerAdSize.stickySize(activity, width))
         }
 
         banner.setBannerAdEventListener(object : BannerAdEventListener {
             override fun onAdLoaded() {
-                Log.w("godot", "YandexAds: onBannerAdLoaded")
+                Log.w(tag, "onBannerAdLoaded")
                 emitSignal("banner_loaded", id)
             }
 
             override fun onAdFailedToLoad(error: AdRequestError) {
-                Log.w(tag, "YandexAds: onBannerAdFailedToLoad. Error: " + error.code)
+                Log.w(tag, "onBannerAdFailedToLoad. Error: " + error.code)
                 emitSignal("banner_failed_to_load", id, error.code)
             }
 
             override fun onAdClicked() {
-                Log.w(tag, "YandexAds: onBannerAdClicked")
+                Log.w(tag, "onBannerAdClicked")
                 emitSignal("banner_ad_clicked", id)
             }
 
             override fun onLeftApplication() {
-                Log.w(tag, "YandexAds: onBannerLeftApplication")
+                Log.w(tag, "onBannerLeftApplication")
                 emitSignal("banner_left_application", id)
             }
 
             override fun onReturnedToApplication() {
-                Log.w(tag, "YandexAds: onBannerReturnedToApplication")
+                Log.w(tag, "onBannerReturnedToApplication")
                 emitSignal("banner_returned_to_application", id)
             }
 
             override fun onImpression(impression: ImpressionData?) {
-                Log.w("godot", "YandexAds: onBannerAdImpression");
+                Log.w(tag, "onBannerAdImpression");
                 emitSignal("banner_on_impression", id, impression?.rawData.orEmpty());
             }
         })
+
+        banner.setAdUnitId(id);
+        banner.setBackgroundColor(Color.TRANSPARENT);
 
         banners[id] = banner
 
@@ -257,36 +253,42 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
     }
 
     private fun createInterstitial(id: String) {
-        val loader = InterstitialAdLoader(godot.getActivity()!!)
+        val activity = activity
+        if (activity == null) {
+            Log.w(tag, "activity is null")
+            return
+        }
+
+        val loader = InterstitialAdLoader(activity)
         loader.setAdLoadListener(object : InterstitialAdLoadListener {
             override fun onAdLoaded(interstitial: InterstitialAd) {
-                Log.w(tag, "onAdLoaded")
+                Log.w(tag, "onInterstitialAdLoaded")
 
                 emitSignal("interstitial_loaded", id)
 
                 interstitial.setAdEventListener(object : InterstitialAdEventListener {
                     override fun onAdShown() {
-                        Log.w(tag, "onAdShown")
+                        Log.w(tag, "onInterstitialAdShown")
                         emitSignal("interstitial_ad_shown", id)
                     }
 
                     override fun onAdFailedToShow(error: AdError) {
-                        Log.w(tag, "onAdFailedToShow: ${error.description}")
+                        Log.w(tag, "onInterstitialAdFailedToShow: ${error.description}")
                         emitSignal("interstitial_failed_to_show", id, error.description)
                     }
 
                     override fun onAdDismissed() {
-                        Log.w(tag, "onAdDismissed")
+                        Log.w(tag, "onInterstitialAdDismissed")
                         emitSignal("interstitial_ad_dismissed", id)
                     }
 
                     override fun onAdClicked() {
-                        Log.w(tag, "onAdClicked")
+                        Log.w(tag, "onInterstitialAdClicked")
                         emitSignal("interstitial_ad_clicked", id)
                     }
 
                     override fun onAdImpression(data: ImpressionData?) {
-                        Log.w(tag, "onAdImpression: ${data?.rawData.orEmpty()}")
+                        Log.w(tag, "onInterstitialAdImpression: ${data?.rawData.orEmpty()}")
                         emitSignal("interstitial_on_impression", id, data?.rawData.orEmpty())
                     }
                 })
@@ -304,9 +306,15 @@ class GodotYandexAds(godot: Godot): GodotPlugin(godot) {
 
     @UsedByGodot
     fun showInterstitial(id: String) {
+        val activity = activity
+        if (activity == null) {
+            Log.w(tag, "activity is null")
+            return
+        }
+
         godot.getActivity()?.runOnUiThread {
             if (interstitials.containsKey(id) && interstitials[id] != null) {
-                interstitials[id]?.show(godot.getActivity()!!)
+                interstitials[id]?.show(activity)
                 Log.d(tag, "showInterstitial: interstitial ok");
             } else {
                 Log.w(tag, "showInterstitial: interstitial not found");
