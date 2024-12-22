@@ -10,6 +10,8 @@
 
 Важно отметить, что плагин поддерживает работу с медиацией. Вы можете подключать другие сетки в кабинете Яндекса и они будут работать через этот плагин
 
+Для правильной работы рекламы AdMob вам необходимо изменить код в файле *GodotYandexAds/export_yandex_ads.gd*. В методе `_get_android_manifest_application_element_contents` нужно указать правильное значение `APPLICATION_ID`. Подробности про реботу с AdMob в [документации Google](https://developers.google.com/admob/android/quick-start?hl=ru)
+
 ## Интеграция
 
 Для интеграции нужно скачать архив со [страницы релизов](https://gitflic.ru/project/kovardin/godot-yandex-ads/release?sort=TIME&direction=DESC) и скопировать плагин в папку *addons/GodotYandexAds*

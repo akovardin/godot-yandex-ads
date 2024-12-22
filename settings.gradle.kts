@@ -21,7 +21,5 @@ dependencyResolutionManagement {
     }
 }
 
-
-// TODO: Update project's name.
 rootProject.name = "GodotYandexAds"
 include(":plugin")
