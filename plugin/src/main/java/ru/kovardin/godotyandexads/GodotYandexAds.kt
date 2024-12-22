@@ -1,6 +1,7 @@
 // TODO: Update to match your plugin's package name.
 package ru.kovardin.godotyandexads
 
+import android.annotation.TargetApi
 import android.app.Activity
 import android.graphics.Color
 import android.graphics.Rect
@@ -11,7 +12,11 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.widget.FrameLayout
-import android.widget.Toast
+import androidx.lifecycle.ProcessLifecycleOwner
+import com.yandex.mobile.ads.appopenad.AppOpenAd
+import com.yandex.mobile.ads.appopenad.AppOpenAdEventListener
+import com.yandex.mobile.ads.appopenad.AppOpenAdLoadListener
+import com.yandex.mobile.ads.appopenad.AppOpenAdLoader
 import org.godotengine.godot.Dictionary
 import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin
@@ -46,6 +51,7 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
     private var interstitials: MutableMap<String, InterstitialAd> = mutableMapOf()
     private var rewardeds: MutableMap<String, RewardedAd> = mutableMapOf()
     private var banners: MutableMap<String, BannerAdView> = mutableMapOf()
+    private var appopen: AppOpenAd? = null;
 
     override fun getPluginName() = BuildConfig.GODOT_PLUGIN_NAME
 
@@ -70,22 +76,38 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
         //rewarded
         signals.add(SignalInfo("rewarded_loaded", String::class.java))
         signals.add(SignalInfo("rewarded_failed_to_load", String::class.java, Integer::class.java))
+        signals.add(SignalInfo("rewarded_failed_to_show", String::class.java, Integer::class.java))
         signals.add(SignalInfo("rewarded_ad_shown", String::class.java))
         signals.add(SignalInfo("rewarded_ad_dismissed", String::class.java))
         signals.add(SignalInfo("rewarded_rewarded", String::class.java, Dictionary::class.java))
         signals.add(SignalInfo("rewarded_ad_clicked", String::class.java))
         signals.add(SignalInfo("rewarded_on_impression", String::class.java, String::class.java))
+        // appopen
+        signals.add(SignalInfo("appopen_loaded", String::class.java))
+        signals.add(SignalInfo("appopen_failed_to_load", String::class.java, Integer::class.java))
+        signals.add(SignalInfo("appopen_failed_to_show", String::class.java, Integer::class.java))
+        signals.add(SignalInfo("appopen_ad_shown", String::class.java))
+        signals.add(SignalInfo("appopen_ad_dismissed", String::class.java))
+        signals.add(SignalInfo("appopen_ad_clicked", String::class.java))
+        signals.add(SignalInfo("appopen_on_impression", String::class.java, String::class.java))
         return signals
     }
 
-    override fun onMainCreate(activity: Activity): View? {
+    override fun onMainCreate(activity: Activity): View {
+        val processLifecycleObserver = DefaultProcessLifecycleObserver(
+            onProcessCameForeground = ::showAppopen
+        )
+
+        ProcessLifecycleOwner.get().lifecycle.addObserver(processLifecycleObserver)
+
         layout = FrameLayout(activity)
         return layout
     }
 
     @UsedByGodot
     fun init() {
-        MobileAds.initialize(godot.getActivity()!!) {
+        val activity = activity ?: return
+        MobileAds.initialize(activity) {
             emitSignal("ads_initialized")
         }
     }
@@ -115,29 +137,19 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
         MobileAds.setAgeRestrictedUser(value)
     }
 
-    private fun request(): AdRequest {
-        return AdRequest.Builder().build()
-    }
-
     @UsedByGodot
     fun loadBanner(id: String, params: Dictionary) {
         godot.getActivity()?.runOnUiThread {
             if (!banners.containsKey(id) || banners[id] == null) {
                 createBanner(id, params)
             } else {
-                banners[id]?.loadAd(request())
+                banners[id]?.loadAd(AdRequest.Builder().build())
             }
         }
     }
 
     private fun createBanner(id: String, params: Dictionary) {
-//        layout = godot.getActivity()!!.window.decorView.rootView as FrameLayout
-
-        val activity = activity
-        if (activity == null) {
-            Log.w(tag, "activity is null")
-            return
-        }
+        val activity = activity ?: return
 
         val banner = BannerAdView(activity)
 
@@ -157,9 +169,9 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
             if (safearea) banner.y = (-getSafeArea().bottom).toFloat()
         }
 
-        var sizeType = params.getOrDefault(BANNER_SIZE_TYPE, BANNER_STICKY_SIZE)
-        var width = params.getOrDefault(BANNER_WIDTH, 0) as Int
-        var height = params.getOrDefault(BANNER_HEIGHT, 0) as Int
+        val sizeType = params.getOrDefault(BANNER_SIZE_TYPE, BANNER_STICKY_SIZE)
+        val width = params.getOrDefault(BANNER_WIDTH, 0) as Int
+        val height = params.getOrDefault(BANNER_HEIGHT, 0) as Int
 
         when (sizeType) {
             BANNER_INLINE_SIZE ->
@@ -196,7 +208,7 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
             }
 
             override fun onImpression(impression: ImpressionData?) {
-                Log.w(tag, "onBannerAdImpression");
+                Log.w(tag, "onBannerAdImpression, impression: ${impression}");
                 emitSignal("banner_on_impression", id, impression?.rawData.orEmpty());
             }
         })
@@ -207,13 +219,14 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
         banners[id] = banner
 
         layout.addView(banner, layoutParams);
-        banner.loadAd(request());
+        banner.loadAd(AdRequest.Builder().build());
     }
 
     @UsedByGodot
     fun removeBanner(id: String) {
         godot.getActivity()?.runOnUiThread {
             if (banners.containsKey(id) && banners[id] != null) {
+                banners[id]?.setBannerAdEventListener(null)
                 layout.removeView(banners[id]) // Remove the banner
                 banners.remove(id)
                 Log.d(tag, "removeBanner: banner ok")
@@ -253,11 +266,7 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
     }
 
     private fun createInterstitial(id: String) {
-        val activity = activity
-        if (activity == null) {
-            Log.w(tag, "activity is null")
-            return
-        }
+        val activity = activity ?: return
 
         val loader = InterstitialAdLoader(activity)
         loader.setAdLoadListener(object : InterstitialAdLoadListener {
@@ -297,7 +306,7 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
             }
 
             override fun onAdFailedToLoad(error: AdRequestError) {
-                Log.w(tag, "onAdFailedToLoad. error: " + error.code)
+                Log.w(tag, "onInterstitialAdFailedToLoad. error: " + error.code)
                 emitSignal("interstitial_failed_to_load", id, error.description)
             }
         })
@@ -306,11 +315,7 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     fun showInterstitial(id: String) {
-        val activity = activity
-        if (activity == null) {
-            Log.w(tag, "activity is null")
-            return
-        }
+        val activity = activity ?: return
 
         godot.getActivity()?.runOnUiThread {
             if (interstitials.containsKey(id) && interstitials[id] != null) {
@@ -318,6 +323,19 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
                 Log.d(tag, "showInterstitial: interstitial ok");
             } else {
                 Log.w(tag, "showInterstitial: interstitial not found");
+            }
+        }
+    }
+
+    @UsedByGodot
+    fun removeInterstitial(id: String) {
+        godot.getActivity()?.runOnUiThread {
+            if (interstitials.containsKey(id) && interstitials[id] != null) {
+                interstitials[id]?.setAdEventListener(null)
+                interstitials.remove(id)
+                Log.d(tag, "removeInterstitial: interstitial ok")
+            } else {
+                Log.w(tag, "removeInterstitial: interstitial not found")
             }
         }
     }
@@ -334,28 +352,28 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
 
         loader.setAdLoadListener(object : RewardedAdLoadListener {
             override fun onAdLoaded(rewarded: RewardedAd) {
-                Log.w(tag, "onAdLoaded")
+                Log.w(tag, "onRewardedAdLoaded")
 
                 emitSignal("rewarded_loaded", id)
 
                 rewarded.setAdEventListener(object : RewardedAdEventListener {
                     override fun onAdShown() {
-                        Log.w(tag, "onAdShown")
+                        Log.w(tag, "onRewardedAdShown")
                         emitSignal("rewarded_ad_shown", id)
                     }
 
                     override fun onAdFailedToShow(error: AdError) {
-                        Log.w(tag, "onAdFailedToShow. error: ${error.description}")
-                        emitSignal("rewarded_ad_shown", id)
+                        Log.w(tag, "onRewardedAdFailedToShow. error: ${error.description}")
+                        emitSignal("rewarded_failed_to_show", id)
                     }
 
                     override fun onAdDismissed() {
-                        Log.w(tag, "onAdDismissed")
+                        Log.w(tag, "onRewardedAdDismissed")
                         emitSignal("rewarded_ad_dismissed", id)
                     }
 
                     override fun onRewarded(reward: Reward) {
-                        Log.w(tag, "YandexAds: onRewarded")
+                        Log.w(tag, "onRewarded. reward: ${reward}")
                         val data = Dictionary()
                         data.set("amount", reward.amount)
                         data.set("type", reward.type)
@@ -363,12 +381,12 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
                     }
 
                     override fun onAdClicked() {
-                        Log.w(tag, "onAdClicked")
+                        Log.w(tag, "onRewardedAdClicked")
                         emitSignal("rewarded_ad_clicked", id)
                     }
 
                     override fun onAdImpression(impression: ImpressionData?) {
-                        Log.w(tag, "onAdImpression")
+                        Log.w(tag, "onRewardedAdImpression")
                         emitSignal("rewarded_on_impression", id, impression?.rawData.orEmpty())
                     }
 
@@ -378,7 +396,7 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
             }
 
             override fun onAdFailedToLoad(error: AdRequestError) {
-                Log.w(tag, "onAdFailedToLoad. error: " + error.code)
+                Log.w(tag, "onRewardedAdFailedToLoad. error: " + error.code)
                 emitSignal("rewarded_failed_to_load", id, error.description)
             }
 
@@ -391,9 +409,91 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
         godot.getActivity()?.runOnUiThread {
             if (rewardeds.containsKey(id) && rewardeds[id] != null) {
                 rewardeds[id]?.show(godot.getActivity()!!)
+                Log.d(tag, "showRewarded: rewarded ok");
             } else {
-                Log.w(tag, "showRewarded");
+                Log.w(tag, "showRewarded: rewarded not found");
             }
+        }
+    }
+
+    @UsedByGodot
+    fun removeRewarded(id: String) {
+        godot.getActivity()?.runOnUiThread {
+            if (rewardeds.containsKey(id) && rewardeds[id] != null) {
+                rewardeds[id]?.setAdEventListener(null)
+                rewardeds.remove(id)
+                Log.d(tag, "removeRewarded: rewarded ok")
+            } else {
+                Log.w(tag, "removeRewarded: rewarded not found")
+            }
+        }
+    }
+
+    @UsedByGodot
+    fun loadAppopen(id: String) {
+        godot.getActivity()?.runOnUiThread {
+            createAppopen(id)
+        }
+    }
+
+    private fun createAppopen(id: String) {
+        val activity = activity ?: return
+
+        val loader = AppOpenAdLoader(activity)
+        loader.setAdLoadListener(object : AppOpenAdLoadListener {
+            override fun onAdLoaded(ad: AppOpenAd) {
+                Log.w(tag, "onAppopenAdLoaded")
+
+                emitSignal("appopen_loaded", id)
+
+                ad.setAdEventListener(object : AppOpenAdEventListener {
+                    override fun onAdShown() {
+                        Log.w(tag, "onAppopenAdShown")
+                        emitSignal("appopen_ad_shown", id)
+                    }
+
+                    override fun onAdFailedToShow(error: AdError) {
+                        Log.w(tag, "onAppopenAdFailedToShow: ${error.description}")
+                        emitSignal("appopen_failed_to_show", id, error.description)
+                    }
+
+                    override fun onAdDismissed() {
+                        Log.w(tag, "onAppopenAdDismissed")
+                        emitSignal("appopen_ad_dismissed", id)
+                    }
+
+                    override fun onAdClicked() {
+                        Log.w(tag, "onAppopenAdClicked")
+                        emitSignal("appopen_ad_clicked", id)
+                    }
+
+                    override fun onAdImpression(data: ImpressionData?) {
+                        Log.w(tag, "onAppopenAdImpression: ${data?.rawData.orEmpty()}")
+                        emitSignal("appopen_on_impression", id, data?.rawData.orEmpty())
+                    }
+                })
+
+                appopen = ad
+            }
+
+            override fun onAdFailedToLoad(error: AdRequestError) {
+                Log.w(tag, "onAppopenAdFailedToLoad. error: " + error.code)
+                emitSignal("appopen_failed_to_load", id, error.description)
+            }
+        })
+        loader.loadAd(AdRequestConfiguration.Builder(id).build())
+    }
+
+    fun showAppopen() {
+        val activity = activity?: return
+        appopen?.show(activity)
+    }
+
+    @UsedByGodot
+    fun removeAppopen() {
+        godot.getActivity()?.runOnUiThread {
+            appopen?.setAdEventListener(null)
+            appopen = null
         }
     }
 
@@ -402,7 +502,7 @@ class GodotYandexAds(godot: Godot) : GodotPlugin(godot) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
             return safeInsetRect
         }
-        val windowInsets: WindowInsets = godot.getActivity()!!.getWindow().getDecorView().getRootWindowInsets()
+        val windowInsets: WindowInsets = activity?.getWindow()?.getDecorView()?.getRootWindowInsets()
             ?: return safeInsetRect
         val displayCutout = windowInsets.displayCutout
         if (displayCutout != null) {

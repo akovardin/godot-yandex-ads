@@ -32,7 +32,8 @@ class AndroidExportPlugin extends EditorExportPlugin:
 
 	func _get_android_dependencies(platform, debug):
 		return PackedStringArray([
-			"com.yandex.android:mobileads-mediation:7.8.0.0"
+			"com.yandex.android:mobileads-mediation:7.8.0.0",
+		    "androidx.lifecycle:lifecycle-process:2.8.7"
 		])
 
 

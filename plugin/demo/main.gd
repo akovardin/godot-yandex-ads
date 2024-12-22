@@ -17,20 +17,26 @@ func _ready():
 	if Engine.has_singleton(_plugin_name):
 		var ads = Engine.get_singleton(_plugin_name)
 
-		ads.banner_loaded.connect(_ad_loaded)
+		ads.banner_loaded.connect(_on_ad_loaded)
 		ads.banner_on_impression.connect(_on_impression)
 
-		ads.interstitial_loaded.connect(_ad_loaded)
-		ads.interstitial_ad_shown.connect(_ad_shown)
+		ads.interstitial_loaded.connect(_on_ad_loaded)
+		ads.interstitial_ad_shown.connect(_on_ad_shown)
 		ads.interstitial_on_impression.connect(_on_impression)
 
-		ads.rewarded_rewarded.connect(_rewarded)
-		ads.rewarded_ad_shown.connect(_ad_shown)
+		ads.rewarded_loaded.connect(_on_ad_loaded)
+		ads.rewarded_ad_shown.connect(_on_ad_shown)
+		ads.rewarded_rewarded.connect(_on_rewarded)
 		ads.rewarded_on_impression.connect(_on_impression)
+
+		ads.appopen_loaded.connect(_on_ad_loaded)
+		ads.appopen_ad_shown.connect(_on_ad_shown)
+		ads.appopen_on_impression.connect(_on_impression)
 
 		ads.loadBanner("demo-banner-yandex", {"size_type": "sticky", "width": 300, "position":0})
 		ads.loadInterstitial("demo-interstitial-yandex")
 		ads.loadRewarded("demo-rewarded-yandex")
+		ads.loadAppopen("demo-appopenad-yandex")
 
 
 func _process(delta):
@@ -55,16 +61,16 @@ func _on_rewarded_button_pressed():
 		ads.showRewarded("demo-rewarded-yandex")
 
 
-func _rewarded(id: String, data: Dictionary):
+func _on_rewarded(id: String, data: Dictionary):
 	print("_rewarded: " + id)
 	print(data)
 
 
-func _ad_loaded(id: String):
+func _on_ad_loaded(id: String):
 	print("_ad_loaded: " + id)
 
 
-func _ad_shown(id: String):
+func _on_ad_shown(id: String):
 	print("_ad_shown: " + id)
 
 

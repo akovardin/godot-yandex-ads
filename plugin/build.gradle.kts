@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        minSdk = 24
 
         manifestPlaceholders["godotPluginName"] = pluginName
         manifestPlaceholders["godotPluginPackageName"] = pluginPackageName
@@ -41,6 +41,7 @@ dependencies {
     implementation("org.godotengine:godot:4.3.0.stable")
 
     implementation("com.yandex.android:mobileads-mediation:7.8.0.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
 }
 
 // BUILD TASKS DEFINITION
