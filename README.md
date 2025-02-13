@@ -1,5 +1,5 @@
 # Godot Yandex Ads
-
+![](https://zarya.kovardin.ru//tracker/impression/godot-yandex-ads)
 Плагин под Godot 4.2+ для интеграции Яндекс рекламы с медиацией
 
 Подробности про использование Yandex Ads SDK в андроид [описаны в документации](https://ads.yandex.com/helpcenter/en/dev/android/quick-start)
