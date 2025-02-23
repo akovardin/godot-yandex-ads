@@ -7,7 +7,7 @@
 ## Реклама
 
 <a href="https://zarya.kovardin.ru/banner/8v0g374le06u49d/click">
-    <img src="https://zarya.kovardin.ru/banner/8v0g374le06u49d" width=100>
+    <img src="https://zarya.kovardin.ru/banner/8v0g374le06u49d" width=350>
 </a>
 
 ## Настройка рекламы
